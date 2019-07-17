@@ -18,8 +18,8 @@
 		cursor += size;					\
 	} while (0);
 
-#define TCP_NUMBER 0x06
-#define UDP_NUMBER 0x11
+#define TCP_NUMBER 	0x06
+#define UDP_NUMBER 	0x11
 
 
 using std::printf;
@@ -31,9 +31,9 @@ struct tcp_packet {
 	uint16_t dp;
 	uint32_t seq;
 	uint32_t ack;
-	unsigned offset : 4;
-	unsigned reserved : 3;
-	unsigned control_flag : 9;
+	unsigned offset		: 4;
+	unsigned reserved	: 3;
+	unsigned control_flag	: 9;
 	/*
 	uint16_t window_size;
 	uint16_t checksum;
@@ -48,13 +48,13 @@ struct udp_packet {
 typedef struct udp_packet udp_t;
 
 struct ip_packet {
-	unsigned version : 4;
-	unsigned header_length : 4;
-	uint8_t type;
+	unsigned version		: 4;
+	unsigned header_length		: 4;
+	uint8_t	type;
 	uint16_t packet_length;
 	uint16_t identifier;
-	unsigned flags : 3;
-	unsigned fragment_offset : 13;
+	unsigned flags			: 3;
+	unsigned fragment_offset	: 13;
 	uint8_t ttl;
 	uint8_t protocol_type;  // TCP: 0x06, UDP: 0x11
 	uint16_t checksum;
@@ -79,6 +79,10 @@ eth_t	wrap_packet_eth(const u_char *packet);
 ip_t	wrap_packet_ip(const u_char *packet);
 tcp_t	wrap_packet_tcp(const u_char *packet);
 udp_t	wrap_packet_udp(const u_char *packet);
+void	analyze_packet(eth_t packet);
+void 	show_mac(eth_t packet);
+void 	show_ip(ip_t packet);
+void 	show_tcp(tcp_t packet);
 
 int main(int argc, char **argv) {
 	if (argc < 2) {
@@ -145,6 +149,8 @@ int main(int argc, char **argv) {
 #ifdef DEBUG
 			printf("Packet length: %d\n", header->caplen);
 			eth_t ethernet = wrap_packet_eth(packet);
+
+			analyze_packet(ethernet);
 #endif
 		}
 		pcap_close(handle);
@@ -167,14 +173,7 @@ eth_t wrap_packet_eth(const u_char *packet) {
 	PUSH(cur, ret.type, sizeof ret.type);
 	
 	ret.data = wrap_packet_ip(cur);
-#ifdef DEBUG
-	printf("s-mac: %02x:%02x:%02x:%02x:%02x:%02x\n",
-		ret.smac[0], ret.smac[1], ret.smac[2],
-		ret.smac[3], ret.smac[4], ret.smac[5]);
-	printf("d-mac: %02x:%02x:%02x:%02x:%02x:%02x\n",
-		ret.dmac[0], ret.dmac[1], ret.dmac[2],
-		ret.dmac[3], ret.dmac[4], ret.dmac[5]);
-#endif
+
 	return ret;
 }
 
@@ -204,16 +203,9 @@ ip_t wrap_packet_ip(const u_char *packet) {
 	PUSH(cur, ret.sip, sizeof ret.sip);
 	PUSH(cur, ret.dip, sizeof ret.dip);
 
-#ifdef DEBUG
-	printf("s-ip: %u.%u.%u.%u\n",
-		ret.sip[0], ret.sip[1],
-		ret.sip[2], ret.sip[3]);
-	printf("d-ip: %u.%u.%u.%u\n",
-		ret.dip[0], ret.dip[1],
-		ret.dip[2], ret.dip[3]);
-#endif
+	// Check protocol type
 	switch (ret.protocol_type) {
-	case TCP_NUMBER:
+	case TCP_NUMBER:  // Is it tcp?
 		ret.tcp = wrap_packet_tcp(cur);
 		break;
 	case UDP_NUMBER:
@@ -221,7 +213,6 @@ ip_t wrap_packet_ip(const u_char *packet) {
 	default:
 		break;
 	}
-
 	return ret;
 }
 
@@ -232,11 +223,16 @@ tcp_t wrap_packet_tcp(const u_char *packet) {
 
 	PUSH(cur, &ret.sp, sizeof ret.sp);
 	PUSH(cur, &ret.dp, sizeof ret.dp);
+	ret.sp = ntohs(ret.sp);
+	ret.dp = ntohs(ret.dp);
 
-#ifdef DEBUG
-	printf("s-port: %u\n", ntohs(ret.sp));
-	printf("d-port: %u\n", ntohs(ret.dp));
-#endif
+	PUSH(cur, &ret.seq, sizeof ret.seq);
+	PUSH(cur, &ret.ack, sizeof ret.ack);
+	
+	uint16_t tmp_16;
+	PUSH(cur, &tmp_16, sizeof tmp_16);
+	ret.offset = (ntohs(tmp_16) & 0xff00) >> 12;
+
 	return ret;
 }
 
@@ -244,7 +240,59 @@ tcp_t wrap_packet_tcp(const u_char *packet) {
 udp_t wrap_packet_udp(const u_char *packet) {
 	udp_t ret;
 	u_char *cur = const_cast<u_char*>(packet);
-
 	return ret;
 }
 
+
+void analyze_packet(eth_t packet) {
+	show_mac(packet);
+	show_ip(packet.data);
+	switch (packet.data.protocol_type) {
+	case TCP_NUMBER:
+		show_tcp(packet.data.tcp);
+		break;
+	case UDP_NUMBER:
+		break;
+	default:
+		break;
+	}
+}
+
+void show_mac(eth_t packet) {
+	int i;
+	printf("eth.smac:\t");
+	for (i = 0; i < sizeof packet.smac; ++i) {
+		printf("%02x%c", packet.smac[i],
+			(i+1 != sizeof packet.smac) ? ':' : '\n');
+	}
+	printf("eth.dmac:\t");
+	for (i = 0; i < sizeof packet.dmac; ++i) {
+		printf("%02x%c", packet.dmac[i],
+			(i+1 != sizeof packet.dmac) ? ':' : '\n');
+	}
+}
+
+void show_ip(ip_t packet) {
+	int i;
+	printf("ip.sip:\t\t");
+	for (i = 0; i < sizeof packet.sip; ++i) {
+		printf("%u%c", packet.sip[i],
+			(i+1 != sizeof packet.sip) ? '.' : '\n');
+	}
+	printf("ip.dip:\t\t");
+	for (i = 0; i < sizeof packet.dip; ++i) {
+		printf("%u%c", packet.dip[i],
+			(i+1 != sizeof packet.dip) ? '.' : '\n');
+	}
+}
+
+void show_tcp(tcp_t packet) {
+	printf("tcp.sport:\t");
+	printf("%u\n", packet.sp);
+	printf("tcp.dport:\t");
+	printf("%u\n", packet.dp);
+
+	printf("data:\t\t");
+	// TODO: Show 10 bytes of data
+	printf("*PLACEHOLDER*\n");
+}
