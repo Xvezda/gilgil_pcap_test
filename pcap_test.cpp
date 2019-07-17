@@ -139,19 +139,19 @@ eth_t wrap_packet(const u_char *packet) {
 	PUSH(cur, ret.dmac, sizeof ret.dmac);
 	PUSH(cur, ret.type, sizeof ret.type);
 
-	uint8_t tmp8_t;
-	PUSH(cur, &tmp8_t, sizeof tmp8_t);
-	ret.data.version = tmp8_t & 0xf0;
-	ret.data.header_length = tmp8_t & 0x0f;
+	uint8_t tmp_8;
+	PUSH(cur, &tmp_8, sizeof tmp_8);
+	ret.data.version = tmp_8 & 0xf0;
+	ret.data.header_length = tmp_8 & 0x0f;
 
 	PUSH(cur, &ret.data.type, sizeof ret.data.type);
 	PUSH(cur, &ret.data.packet_length, sizeof ret.data.packet_length);
 	PUSH(cur, &ret.data.identifier, sizeof ret.data.identifier);
 
-	uint16_t tmp16_t;
-	PUSH(cur, &tmp16_t, sizeof tmp16_t);
-	ret.data.flags = tmp16_t & 0xe000;
-	ret.data.fragment_offset = tmp16_t & 0x1fff;
+	uint16_t tmp_16;
+	PUSH(cur, &tmp_16, sizeof tmp_16);
+	ret.data.flags = tmp_16 & 0xe000;
+	ret.data.fragment_offset = tmp_16 & 0x1fff;
 	
 	PUSH(cur, &ret.data.ttl, sizeof ret.data.ttl);
 	PUSH(cur, &ret.data.protocol_type, sizeof ret.data.protocol_type);
