@@ -7,19 +7,14 @@
 #include <stdint.h>
 
 #include <pcap.h>
-
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <linux/limits.h>
 
 #define PUSH(cursor, target, size) 				\
 	do { 							\
 		std::memcpy(target, cursor, size);		\
-		cursor += size;					\
+		(cursor) += (size);					\
 	} while (0);
-
-#define TCP_NUMBER 	0x06
-#define UDP_NUMBER 	0x11
 
 #define ETH_HEADER_SIZE	24
 #define IP_HEADER_SIZE 	20
@@ -30,6 +25,11 @@
 using std::printf;
 using std::strlen;
 using std::memcpy;
+
+enum ProtocolNumber {
+	TCP_NUMBER = 0x06,
+	UDP_NUMBER = 0x11
+};
 
 struct tcp_packet {
 	uint16_t sp;
@@ -43,7 +43,7 @@ struct tcp_packet {
 	uint16_t checksum;
 	uint16_t urgent_pointer;
 	uint8_t *data;
-	size_t tcp_len;
+	size_t tcp_size;
 };
 typedef struct tcp_packet tcp_t;
 
@@ -79,10 +79,10 @@ struct ethernet_frame {
 };
 typedef struct ethernet_frame eth_t;
 
-eth_t	wrap_packet_eth(const u_char *packet);
-ip_t	wrap_packet_ip(const u_char *packet);
-tcp_t	wrap_packet_tcp(const u_char *packet, size_t len);
-udp_t	wrap_packet_udp(const u_char *packet);
+eth_t	wrap_packet_eth(const u_char *raw_packet);
+ip_t	wrap_packet_ip(const u_char *raw_packet);
+tcp_t	wrap_packet_tcp(const u_char *raw_packet, size_t len);
+udp_t	wrap_packet_udp(const u_char *raw_packet);
 void	analyze_packet(eth_t packet);
 void 	show_mac(eth_t packet);
 void 	show_ip(ip_t packet);
@@ -94,13 +94,8 @@ int main(int argc, char **argv) {
 
 		return EXIT_FAILURE;
 	}
-	int o = 0;
-
 	char errbuf[PCAP_ERRBUF_SIZE];
-
-	char *filepath = nullptr;
 	char *device = nullptr;
-
 	pcap_t *handle = nullptr;
 
 	device = argv[1];
@@ -112,13 +107,13 @@ int main(int argc, char **argv) {
 	}
 	for (;;) {
 		struct pcap_pkthdr *header;
-		const u_char *packet;
+		const u_char *raw_packet;
 
-		int res = pcap_next_ex(handle, &header, &packet);
+		int res = pcap_next_ex(handle, &header, &raw_packet);
 		if (!res) continue;
 		if (res == -1 || res == -2) break;
 
-		eth_t ethernet = wrap_packet_eth(packet);
+		eth_t ethernet = wrap_packet_eth(raw_packet);
 		analyze_packet(ethernet);
 	}
 	pcap_close(handle);
@@ -127,9 +122,9 @@ int main(int argc, char **argv) {
 }
 
 
-eth_t wrap_packet_eth(const u_char *packet) {
+eth_t wrap_packet_eth(const u_char *raw_packet) {
 	eth_t ret;
-	u_char *cur = const_cast<u_char*>(packet);
+	u_char *cur = const_cast<u_char*>(raw_packet);
 
 	PUSH(cur, ret.smac, sizeof ret.smac);
 	PUSH(cur, ret.dmac, sizeof ret.dmac);
@@ -144,9 +139,9 @@ eth_t wrap_packet_eth(const u_char *packet) {
 }
 
 
-ip_t wrap_packet_ip(const u_char *packet) {
+ip_t wrap_packet_ip(const u_char *raw_packet) {
 	ip_t ret;
-	u_char *cur = const_cast<u_char*>(packet);
+	u_char *cur = const_cast<u_char*>(raw_packet);
 
 	uint8_t tmp_8;
 	PUSH(cur, &tmp_8, sizeof tmp_8);
@@ -186,9 +181,9 @@ ip_t wrap_packet_ip(const u_char *packet) {
 }
 
 
-tcp_t wrap_packet_tcp(const u_char *packet, size_t len) {
+tcp_t wrap_packet_tcp(const u_char *raw_packet, size_t len) {
 	tcp_t ret;
-	u_char *cur = const_cast<u_char*>(packet);
+	u_char *cur = const_cast<u_char*>(raw_packet);
 
 	PUSH(cur, &ret.sp, sizeof ret.sp);
 	PUSH(cur, &ret.dp, sizeof ret.dp);
@@ -206,8 +201,8 @@ tcp_t wrap_packet_tcp(const u_char *packet, size_t len) {
 	PUSH(cur, &ret.checksum, sizeof ret.checksum);
 	PUSH(cur, &ret.urgent_pointer, sizeof ret.urgent_pointer);
 	
-	ret.tcp_len = len;
-	if (!ret.tcp_len) {
+	ret.tcp_size = len;
+	if (!ret.tcp_size) {
 		ret.data = nullptr;
 	} else {
 		int i;
@@ -223,9 +218,9 @@ tcp_t wrap_packet_tcp(const u_char *packet, size_t len) {
 }
 
 
-udp_t wrap_packet_udp(const u_char *packet) {
+udp_t wrap_packet_udp(const u_char *raw_packet) {
 	udp_t ret;
-	u_char *cur = const_cast<u_char*>(packet);
+	u_char *cur = const_cast<u_char*>(raw_packet);
 	return ret;
 }
 
@@ -280,10 +275,10 @@ void show_tcp(tcp_t packet) {
 	printf("%u\n", packet.sp);
 	printf("tcp.dport:\t");
 	printf("%u\n", packet.dp);
-	if (packet.tcp_len) {
+	if (packet.tcp_size) {
 		printf("data:\t\t");
 		for (i = 0;
-			i < packet.tcp_len && i < TCP_LEN_MAX; ++i) {
+			i < packet.tcp_size && i < TCP_LEN_MAX; ++i) {
 			printf("%02x ", packet.data[i]);
 		}
 		printf("\n");
