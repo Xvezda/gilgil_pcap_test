@@ -10,10 +10,15 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+using std::printf;
+using std::strlen;
+using std::memcpy;
+
+
 #define PUSH(cursor, target, size) 				\
 	do { 							\
-		std::memcpy(target, cursor, size);		\
-		(cursor) += (size);					\
+		memcpy(target, cursor, size);			\
+		(cursor) += (size);				\
 	} while (0);
 
 #define ETH_HEADER_SIZE	24
@@ -21,10 +26,6 @@
 #define TCP_HEADER_SIZE	20
 #define TCP_LEN_MAX	10
 
-
-using std::printf;
-using std::strlen;
-using std::memcpy;
 
 enum ProtocolNumber {
 	TCP_NUMBER = 0x06,
@@ -48,6 +49,11 @@ struct tcp_packet {
 typedef struct tcp_packet tcp_t;
 
 struct udp_packet {
+	uint16_t sp;
+	uint16_t dp;
+	uint16_t length;
+	uint16_t checksum;
+	uint8_t *data;
 };
 typedef struct udp_packet udp_t;
 
@@ -145,8 +151,8 @@ ip_t wrap_packet_ip(const u_char *raw_packet) {
 
 	uint8_t tmp_8;
 	PUSH(cur, &tmp_8, sizeof tmp_8);
-	ret.version = tmp_8 & 0xf0;
-	ret.header_length = tmp_8 & 0x0f;
+	ret.version = (tmp_8 & 0xf0) >> 4;
+	ret.header_length = (tmp_8 & 0x0f) * 4;
 
 	PUSH(cur, &ret.type, sizeof ret.type);
 	PUSH(cur, &ret.packet_length, sizeof ret.packet_length);
