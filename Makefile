@@ -1,5 +1,5 @@
 CPP=g++
-CPPFLAGS=-g -DDEBUG
+#CPPFLAGS=-g -DDEBUG
 LDLIBS=-lpcap
 
 TARGET=pcap_test
