@@ -9,8 +9,6 @@ TARGET = $(patsubst %.cpp, %, $(SRC_FILE))
 
 all: $(TARGET)
 
-$(TARGET): $(SRC_FILE:.cpp=.h)
-
 clean:
 	rm -f *.o
 	rm -f $(TARGET)
