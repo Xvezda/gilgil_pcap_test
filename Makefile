@@ -1,4 +1,5 @@
 CPP=g++
+CPPFLAGS=-std=c++14
 #CPPFLAGS=-g -DDEBUG
 LDLIBS=-lpcap
 
