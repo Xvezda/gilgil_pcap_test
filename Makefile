@@ -1,12 +1,15 @@
-CPP=g++
-CPPFLAGS=-std=c++14
-#CPPFLAGS=-g -DDEBUG
-LDLIBS=-lpcap
+CPP = g++
+CPPFLAGS = -std=c++14
+#CPPFLAGS = -std=c++14 -O0 -g -DDEBUG
+LDLIBS = -lpcap
 
-TARGET=pcap_test
+SRC_FILE = pcap_test.cpp
+TARGET = $(patsubst %.cpp, %, $(SRC_FILE))
 
 
 all: $(TARGET)
+
+$(TARGET): $(SRC_FILE:.cpp=.h)
 
 clean:
 	rm -f *.o
